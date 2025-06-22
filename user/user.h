@@ -22,6 +22,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+uint64 map_shared_pages(void *src_va, int pid, int size);
+uint64 unmap_shared_pages(void *va, int size);
 
 // ulib.c
 int stat(const char*, struct stat*);

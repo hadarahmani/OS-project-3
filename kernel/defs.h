@@ -106,6 +106,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+struct proc*    find_proc_by_pid(int);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -140,6 +141,8 @@ void            argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
+uint64          sys_map_shared_pages(void);
+uint64          sys_unmap_shared_pages(void);
 
 // trap.c
 extern uint     ticks;
@@ -167,6 +170,8 @@ uint64          uvmdealloc(pagetable_t, uint64, uint64);
 int             uvmcopy(pagetable_t, pagetable_t, uint64);
 void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
+uint64          map_shared_pages(struct proc*, struct proc*, uint64, uint64);
+uint64          unmap_shared_pages(struct proc*, uint64, uint64);
 void            uvmclear(pagetable_t, uint64);
 pte_t *         walk(pagetable_t, uint64, int);
 uint64          walkaddr(pagetable_t, uint64);

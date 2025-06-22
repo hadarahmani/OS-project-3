@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "proc.h"
+#include "spinlock.h"
 
 /*
  * the kernel's page table.
@@ -183,13 +185,15 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
+    // משחרר פיזית רק אם הדף לא משותף
+    if(do_free && !(*pte & PTE_S)){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
     *pte = 0;
   }
 }
+
 
 // create an empty user page table.
 // returns 0 if out of memory.
@@ -437,3 +441,45 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+uint64
+map_shared_pages(struct proc *src, struct proc *dst, uint64 src_va, uint64 size)
+{
+  uint64 start = PGROUNDDOWN(src_va);
+  uint64 end = PGROUNDUP(src_va + size);
+
+  // בחר כתובת יעד פנויה בתהליך היעד
+  uint64 dst_va = PGROUNDUP(dst->sz);
+
+  for (uint64 addr = start, da = dst_va; addr < end; addr += PGSIZE, da += PGSIZE) {
+    pte_t *pte = walk(src->pagetable, addr, 0);
+    if (!pte || !(*pte & PTE_V))
+      return -1;
+
+    uint64 pa = PTE2PA(*pte);
+    uint flags = PTE_FLAGS(*pte);
+
+    if (mappages(dst->pagetable, da, PGSIZE, pa, flags | PTE_S) != 0)
+      return -1;
+  }
+
+  dst->sz = dst_va + (end - start);
+  return dst_va + (src_va - start);
+}
+
+uint64
+unmap_shared_pages(struct proc* p, uint64 addr, uint64 size)
+{
+  uint64 start = PGROUNDDOWN(addr);
+  uint64 end = PGROUNDUP(addr + size);
+
+  for (uint64 a = start; a < end; a += PGSIZE) {
+    pte_t *pte = walk(p->pagetable, a, 0);
+    if (!pte || !(*pte & PTE_V) || !(*pte & PTE_S))
+      return -1;
+  }
+
+  uvmunmap(p->pagetable, start, (end - start) / PGSIZE, 0);
+  return 0;
+}
+
