@@ -2,52 +2,47 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-  int pid;
-  int ppid = getpid();
-  char *shmem;
+  int parent = getpid();
   int size = 4096;
 
-  pid = fork();
+  char *parent_buf = sbrk(size);
+  printf("PARENT: pid=%d buf=%p\n", parent, parent_buf);
+
+  int pid = fork();
   if (pid < 0) {
     printf("fork failed\n");
     exit(1);
   }
 
   if (pid == 0) {
-    // CHILD
-    printf("child: sz before = %d\n", sbrk(0));
+    int mypid = getpid();
+    printf("CHILD: pid=%d ppid=%d\n", mypid, parent);
+    printf("CHILD: sz before = %d\n", sbrk(0));
 
-    // הקצה מקום חדש אצל הילד
-    char *child_buf = sbrk(size);
+    char *shmem = (char*) map_shared_pages(parent_buf, mypid, size);
+    printf("CHILD: got shmem = %p\n", shmem);
 
-    shmem = (char*) map_shared_pages(child_buf, ppid, size);
     if ((uint64)shmem == (uint64)-1) {
-      printf("child: map_shared_pages failed\n");
+      printf("CHILD: map_shared_pages failed\n");
       exit(1);
     }
 
-    printf("child: sz after mapping = %d\n", sbrk(0));
     strcpy(shmem, "Hello daddy!");
-    printf("child wrote: %s\n", shmem);
-    printf("child: exiting\n");
+    printf("CHILD: wrote: '%s'\n", shmem);
+
+    printf("CHILD: sz after = %d\n", sbrk(0));
+    printf("CHILD: exiting\n");
     exit(0);
 
   } else {
     wait(0);
 
-    // ההורה מקצה מקום משלו
-    char *parent_buf = sbrk(size);
-
-    shmem = (char*) map_shared_pages(parent_buf, pid, size);
-    if ((uint64)shmem == (uint64)-1) {
-      printf("parent: map_shared_pages failed\n");
-      exit(1);
-    }
-
-    printf("parent read: %s\n", shmem);
+    // פשוט קרא מה-buffer המקורי — אין צורך ב-map נוסף!
+    printf("PARENT: after wait, buf content is: '%s'\n", parent_buf);
+    printf("PARENT: buf addr is: %p\n", parent_buf);
+    printf("PARENT: done\n");
     exit(0);
   }
 }
