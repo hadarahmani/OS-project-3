@@ -10,19 +10,20 @@ uint64
 sys_map_shared_pages(void)
 {
   uint64 src_va;
-  int pid;
+  int pid; // מקור
   int size;
 
   argaddr(0, &src_va);
   argint(1, &pid);
   argint(2, &size);
 
-  struct proc *dst = find_proc_by_pid(pid);
-  if (dst == 0)
+  struct proc *src = find_proc_by_pid(pid);
+  if (src == 0)
     return -1;
 
-  return map_shared_pages(myproc(), dst, src_va, size);
+  return map_shared_pages(src, myproc(), src_va, size);
 }
+
 
 uint64
 sys_unmap_shared_pages(void)
@@ -35,6 +36,7 @@ sys_unmap_shared_pages(void)
 
   return unmap_shared_pages(myproc(), addr, size);
 }
+
 
 
 uint64

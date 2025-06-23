@@ -447,14 +447,9 @@ map_shared_pages(struct proc *src, struct proc *dst, uint64 src_va, uint64 size)
 {
   uint64 start = PGROUNDDOWN(src_va);
   uint64 end = PGROUNDUP(src_va + size);
+  uint64 offset = src_va - start;
 
-  // בחר כתובת פנויה ב-dst
   uint64 dst_va = PGROUNDUP(dst->sz);
-
-  // נוודא שהזיכרון מספיק
-  uint64 new_sz = dst_va + (end - start);
-  if (uvmalloc(dst->pagetable, dst->sz, new_sz, PTE_W) == 0)
-    return -1;
 
   for (uint64 addr = start, da = dst_va; addr < end; addr += PGSIZE, da += PGSIZE) {
     pte_t *pte = walk(src->pagetable, addr, 0);
@@ -464,18 +459,17 @@ map_shared_pages(struct proc *src, struct proc *dst, uint64 src_va, uint64 size)
     uint64 pa = PTE2PA(*pte);
     uint flags = PTE_FLAGS(*pte);
 
-    // ננקה אם צריך remap ישן
-    uvmunmap(dst->pagetable, da, 1, 1);
-
     if (mappages(dst->pagetable, da, PGSIZE, pa, flags | PTE_S) != 0)
       return -1;
   }
 
-  dst->sz = new_sz;
+  dst->sz = dst_va + (end - start);
 
-  // החזר את הכתובת ב-dst עם אותו offset כמו src_va
-  return dst_va + (src_va - start);
+  return dst_va + offset;
 }
+
+
+
 
 uint64
 unmap_shared_pages(struct proc* p, uint64 addr, uint64 size)
